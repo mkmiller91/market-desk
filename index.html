@@ -1,0 +1,78 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Market Desk | Michael K. Miller</title>
+<style>
+:root{--bg:#f2f4f7;--panel:#fff;--ink:#14233b;--mute:#5d6b82;--line:#d9dee7;--accent:#0f4c81;--up:#1b7f4b;--dn:#b3261e;--mid:#b7791f}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+h1,h2,h3{font-family:Georgia,"Times New Roman",serif;margin:0;font-weight:600}
+header{background:var(--ink);color:#fff;padding:22px 5vw}header h1{font-size:28px}header p{margin:4px 0 0;color:#b9c4d8;max-width:70ch}
+nav{display:flex;gap:4px;overflow-x:auto;background:#fff;border-bottom:1px solid var(--line);padding:0 5vw;position:sticky;top:0;z-index:5}
+nav button{border:0;background:none;padding:14px 14px;font:inherit;color:var(--mute);cursor:pointer;border-bottom:3px solid transparent;white-space:nowrap}
+nav button.on{color:var(--accent);border-color:var(--accent);font-weight:600}button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+main{padding:22px 5vw;max-width:1280px;margin:auto}.panel{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:18px;margin-bottom:18px}
+.grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(230px,1fr))}.sig{border:1px solid var(--line);border-left:5px solid var(--mute);border-radius:4px;padding:12px;background:#fff}
+.sig.up{border-left-color:var(--up)}.sig.dn{border-left-color:var(--dn)}.sig.mid{border-left-color:var(--mid)}.sig b{font-size:22px;display:block}.sig small,.note{color:var(--mute)}
+.gauge{height:16px;border-radius:8px;background:linear-gradient(90deg,var(--dn),var(--mid),var(--up));position:relative;margin:14px 0 6px}.gauge i{position:absolute;top:-5px;width:6px;height:26px;background:var(--ink);border-radius:3px;transition:left .5s}
+.bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px}.chip,.rng{border:1px solid var(--line);background:#fff;border-radius:16px;padding:4px 12px;cursor:pointer;font:inherit;color:var(--ink)}
+.chip.on,.rng.on{background:var(--accent);color:#fff;border-color:var(--accent)}.cv{position:relative;height:380px}
+table{width:100%;border-collapse:collapse;font-size:14px;margin-top:12px}th,td{text-align:right;padding:7px 8px;border-bottom:1px solid var(--line)}th:first-child,td:first-child{text-align:left}
+label{display:block;font-size:13px;color:var(--mute);margin-top:10px}input,select{width:100%;padding:8px;border:1px solid var(--line);border-radius:4px;font:inherit}
+.out{margin-top:14px;padding:12px;background:var(--bg);border-radius:4px;font-size:16px}.cols{display:grid;gap:18px;grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
+a{color:var(--accent)}footer{padding:20px 5vw;color:var(--mute);font-size:12px;max-width:1280px;margin:auto}.err{color:var(--dn)}
+</style></head><body>
+<header><h1>Market Desk</h1><p>A live macro, liquidity and risk dashboard built by Michael K. Miller, Widener University economics student working toward a career as a hedge fund portfolio manager.</p></header>
+<nav id="tabs" role="tablist"></nav><main id="main"><p>Loading data…</p></main>
+<footer>Not investment advice. Educational project. This product uses the FRED® API but is not endorsed or certified by the Federal Reserve Bank of St. Louis. Data: <span id="upd">loading</span>. Built with Claude (AI) from my specifications; I reviewed the logic and calculations.</footer>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+const M={DGS2:['2Y Treasury yield','%'],DGS10:['10Y Treasury yield','%'],T10Y2Y:['10Y–2Y curve','pp'],T10Y3M:['10Y–3M curve','pp'],DFII10:['10Y real yield (TIPS)','%'],T10YIE:['10Y breakeven inflation','%'],T5YIFR:['5Y5Y forward inflation','%'],
+BAMLH0A0HYM2:['High-yield spread (OAS)','%'],BAMLC0A0CM:['Investment-grade spread (OAS)','%'],NFCI:['Chicago Fed financial conditions','idx'],STLFSI4:['St. Louis Fed stress index','idx'],VIXCLS:['VIX','pts'],
+NETLIQ:['Fed net liquidity','$T'],WALCL:['Fed balance sheet','$M'],RRPONTSYD:['Reverse repo facility','$B'],WTREGEN:['Treasury General Account','$M'],DTWEXBGS:['Broad dollar index','idx'],DCOILWTICO:['WTI crude oil','$/bbl'],
+ICSA:['Initial jobless claims','#'],UNRATE:['Unemployment rate','%'],CPIYOY:['CPI inflation, year over year','%'],GDPNOW:['Atlanta Fed GDPNow','%'],SAHMREALTIME:['Sahm recession indicator','pp'],WEI:['Weekly Economic Index','%'],USEPUINDXD:['Economic policy uncertainty (daily)','idx']};
+const TABS=[{id:'reg',n:'Regime'},
+{id:'rates',n:'Rates & Curve',s:['T10Y2Y','T10Y3M','DGS2','DGS10','DFII10','T10YIE'],d:['T10Y2Y','T10Y3M'],w:'The curve and real yields set the cost of capital. Inversions have led most recessions; breakevens show what the bond market expects for inflation.'},
+{id:'cred',n:'Credit & Volatility',s:['BAMLH0A0HYM2','BAMLC0A0CM','VIXCLS','NFCI','STLFSI4'],d:['BAMLH0A0HYM2','VIXCLS'],w:'Credit spreads and volatility are the market’s fear gauges. Credit usually widens before equities fall.'},
+{id:'liq',n:'Liquidity & Dollar',s:['NETLIQ','RRPONTSYD','WTREGEN','WALCL','DTWEXBGS','DCOILWTICO'],d:['NETLIQ'],w:'Net liquidity = Fed balance sheet minus Treasury General Account minus reverse repo. Many macro funds track it as a driver of risk assets.'},
+{id:'mac',n:'Growth & Inflation',s:['ICSA','UNRATE','CPIYOY','GDPNOW','T5YIFR'],d:['GDPNOW','CPIYOY'],w:'Labor, inflation and growth nowcasts that drive the Fed’s reaction function.'},
+{id:'edge',n:'Beyond the Terminal',s:['SAHMREALTIME','WEI','USEPUINDXD','NETLIQ','STLFSI4','T5YIFR'],d:['SAHMREALTIME','WEI'],w:'Less-watched signals: the real-time Sahm rule, a weekly high-frequency growth index, daily policy uncertainty, and net liquidity. Use them to cross-check the headline data.'},
+{id:'risk',n:'Risk Desk'},{id:'about',n:'About Me'}];
+const COL=['#0f4c81','#b7791f','#1b7f4b','#b3261e','#6b4fa0','#00838f'];
+let D={},cur='reg',sel={},yrs=3,zs=false,chart=null;
+const $=s=>document.querySelector(s),fmt=(x,n=2)=>x==null||isNaN(x)?'–':x.toLocaleString(undefined,{maximumFractionDigits:n});
+const last=id=>{const s=D[id];return s?s.v[s.v.length-1]:null};
+const back=(id,days)=>{const s=D[id];if(!s)return null;const c=Date.parse(s.t[s.t.length-1])-days*864e5;let k=s.t.length-1;while(k>0&&Date.parse(s.t[k])>c)k--;return s.v[k]};
+function derive(){const w=D.WALCL,g=D.WTREGEN,r=D.RRPONTSYD;if(w&&g&&r){const t=[],v=[];let gi=0,ri=0;w.t.forEach((d,i)=>{while(gi<g.t.length-1&&g.t[gi+1]<=d)gi++;while(ri<r.t.length-1&&r.t[ri+1]<=d)ri++;t.push(d);v.push((w.v[i]-g.v[gi])/1e6-r.v[ri]/1e3)});D.NETLIQ={t,v}}
+const c=D.CPIAUCSL;if(c){const t=[],v=[];for(let i=12;i<c.v.length;i++){t.push(c.t[i]);v.push((c.v[i]/c.v[i-12]-1)*100)}D.CPIYOY={t,v}}}
+function slice(id){const s=D[id];if(!s)return{t:[],v:[]};const c=Date.parse(s.t[s.t.length-1])-yrs*365.25*864e5;const k=s.t.findIndex(d=>Date.parse(d)>=c);return{t:s.t.slice(k),v:s.v.slice(k)}}
+const RULES=[
+['T10Y2Y','10Y–2Y curve',v=>v>.25?1:v<0?-1:0,'pp','Positive and steepening is supportive; inverted is a warning.'],
+['BAMLH0A0HYM2','High-yield spread',v=>v<4?1:v>5.5?-1:0,'%','Tight spreads mean credit is calm; above 5.5% signals stress.'],
+['VIXCLS','VIX',v=>v<16?1:v>25?-1:0,'pts','Low implied volatility favors risk-taking.'],
+['NFCI','Financial conditions',v=>v<-.3?1:v>0?-1:0,'idx','Below zero is looser than average.'],
+['SAHMREALTIME','Sahm indicator',v=>v<.3?1:v>=.5?-1:0,'pp','0.5 or more has marked the start of past recessions.'],
+['WEI','Weekly Economic Index',v=>v>2?1:v<1?-1:0,'%','Growth proxy scaled to year-over-year GDP growth.']];
+function regime(){const el=$('#main');let sc=0,n=0,h='';RULES.forEach(([id,nm,f,u,tip])=>{const v=last(id);if(v==null)return;const s=f(v);sc+=s;n++;h+=`<div class="sig ${s>0?'up':s<0?'dn':'mid'}"><small>${nm}</small><b>${fmt(v)} ${u}</b><small>${s>0?'Risk-on':s<0?'Risk-off':'Neutral'}. ${tip}</small></div>`});
+const pos=n?(sc+n)/(2*n)*100:50,lab=sc>=3?'Risk-on':sc<=-3?'Risk-off':'Mixed';
+el.innerHTML=`<div class="panel"><h2>Regime: ${lab}</h2><div class="gauge"><i style="left:calc(${pos}% - 3px)"></i></div><div class="note">Score ${sc} of ±${n}. Each signal votes +1, 0 or −1 using the thresholds shown on its card. These are my own rules, kept simple so they can be audited and changed.</div></div><div class="grid">${h}</div>
+<div class="panel" style="margin-top:18px"><h3>What changed in the past month</h3><table><tr><th>Series</th><th>Latest</th><th>1M ago</th><th>Change</th></tr>${['DGS10','T10Y2Y','BAMLH0A0HYM2','VIXCLS','NETLIQ','DTWEXBGS','DCOILWTICO'].filter(i=>D[i]).map(i=>{const a=last(i),b=back(i,30);return`<tr><td>${M[i][0]}</td><td>${fmt(a)}</td><td>${fmt(b)}</td><td>${fmt(a-b)}</td></tr>`}).join('')}</table></div>`}
+function pane(t){sel[t.id]=sel[t.id]||t.d.slice();$('#main').innerHTML=`<div class="panel"><p class="note">${t.w}</p><div class="bar" id="chips">${t.s.filter(i=>D[i]).map(i=>`<button class="chip ${sel[t.id].includes(i)?'on':''}" data-i="${i}">${M[i][0]}</button>`).join('')}</div>
+<div class="bar">${[1,3,5,10].map(y=>`<button class="rng ${y==yrs?'on':''}" data-y="${y}">${y}Y</button>`).join('')}<button class="rng ${zs?'on':''}" id="z">Z-score (compare scales)</button></div><div class="cv"><canvas id="cv"></canvas></div><div id="st"></div></div>`;
+document.querySelectorAll('.chip').forEach(b=>b.onclick=()=>{const a=sel[t.id],i=b.dataset.i;a.includes(i)?a.length>1&&a.splice(a.indexOf(i),1):a.push(i);pane(t)});
+document.querySelectorAll('.rng[data-y]').forEach(b=>b.onclick=()=>{yrs=+b.dataset.y;pane(t)});$('#z').onclick=()=>{zs=!zs;pane(t)};
+const ids=sel[t.id];const ds=ids.map((id,k)=>{const s=slice(id);let v=s.v;if(zs){const m=v.reduce((a,b)=>a+b,0)/v.length,sd=Math.sqrt(v.reduce((a,b)=>a+(b-m)**2,0)/v.length)||1;v=v.map(x=>(x-m)/sd)}return{label:M[id][0],data:s.t.map((d,i)=>({x:Date.parse(d),y:v[i]})),borderColor:COL[k%6],borderWidth:1.7,pointRadius:0,parsing:false}});
+if(chart)chart.destroy();chart=new Chart($('#cv'),{type:'line',data:{datasets:ds},options:{maintainAspectRatio:false,animation:false,interaction:{mode:'index',intersect:false},scales:{x:{type:'linear',ticks:{callback:v=>new Date(v).getFullYear(),maxTicksLimit:10}},y:{title:{display:true,text:zs?'Standard deviations':ids.length==1?M[ids[0]][1]:''}}},plugins:{tooltip:{callbacks:{title:i=>new Date(i[0].parsed.x).toLocaleDateString()}}}}});
+$('#st').innerHTML=`<table><tr><th>Series</th><th>Latest</th><th>1M change</th><th>Percentile in window</th></tr>${ids.map(id=>{const s=slice(id),a=last(id),p=s.v.filter(x=>x<=a).length/s.v.length*100;return`<tr><td>${M[id][0]} (${M[id][1]})</td><td>${fmt(a)}</td><td>${fmt(a-back(id,30))}</td><td>${fmt(p,0)}th</td></tr>`}).join('')}</table>`}
+function risk(){$('#main').innerHTML=`<div class="cols">
+<div class="panel"><h3>Position size</h3><label>Account ($)<input id="a1" type="number" value="1000000"></label><label>Risk per trade (% of account)<input id="a2" type="number" value="0.5" step="0.1"></label><label>Entry price<input id="a3" type="number" value="100"></label><label>Stop price<input id="a4" type="number" value="95"></label><div class="out" id="o1"></div></div>
+<div class="panel"><h3>Kelly criterion</h3><label>Win probability (%)<input id="k1" type="number" value="55"></label><label>Average win ÷ average loss<input id="k2" type="number" value="1.2" step="0.1"></label><div class="out" id="o2"></div><p class="note">Full Kelly maximizes long-run growth but is very volatile; funds usually size at half Kelly or less.</p></div>
+<div class="panel"><h3>Parametric VaR</h3><label>Portfolio value ($)<input id="v1" type="number" value="10000000"></label><label>Annualized volatility (%)<input id="v2" type="number" value="12"></label><label>Horizon (trading days)<input id="v3" type="number" value="1"></label><label>Confidence<select id="v4"><option value="1.2816">90%</option><option value="1.6449" selected>95%</option><option value="2.3263">99%</option></select></label><div class="out" id="o3"></div><p class="note">Assumes normal returns, so it understates tail risk.</p></div></div>`;
+const g=i=>+$('#'+i).value,calc=()=>{const r=g('a1')*g('a2')/100,d=Math.abs(g('a3')-g('a4')),sh=d?Math.floor(r/d):0;$('#o1').innerHTML=`Risk budget $${fmt(r,0)}<br>Size: <b>${fmt(sh,0)}</b> shares ($${fmt(sh*g('a3'),0)}, ${fmt(sh*g('a3')/g('a1')*100,1)}% of account)`;
+const p=g('k1')/100,b=g('k2'),f=p-(1-p)/b;$('#o2').innerHTML=`Full Kelly: <b>${fmt(f*100,1)}%</b> of capital<br>Half Kelly: <b>${fmt(f*50,1)}%</b>${f<=0?'<br><span class="err">No edge: do not take this bet.</span>':''}`;
+const va=g('v1')*g('v4')*g('v2')/100*Math.sqrt(g('v3')/252);$('#o3').innerHTML=`Loss not expected to be exceeded: <b>$${fmt(va,0)}</b> (${fmt(va/g('v1')*100,2)}% of portfolio)`};
+document.querySelectorAll('input,select').forEach(e=>e.oninput=calc);calc()}
+function about(){$('#main').innerHTML=`<div class="panel"><h2>Michael K. Miller</h2><p>Economics major (Financial Services specialization; minors in Finance and Taxation) at Widener University, B.S.B.A. May 2028, 3.5 GPA. Widener football defensive end, 2025 2nd Team All-Conference. Licensed Pennsylvania Resident Producer (life and fixed annuities). Completed Bloomberg Market Concepts and the Federal Reserve Bank of St. Louis FRED Data Practitioner course. Goal: portfolio management at a hedge fund, and later my own financial planning practice.</p>
+<p>I use this site to practice how a macro desk thinks: read the regime, find what is changing, size the risk. Next additions: CFTC positioning, 13F holdings overlap and a regime-based backtest.</p>
+<p><a href="https://www.linkedin.com/in/michael-miller06">LinkedIn</a> · <a href="https://mkmiller91.github.io/macro-dashboard/">Macro Dashboard</a> · <a href="https://mkmiller91.github.io/Advisor-Snapshot/">Client Snapshot</a> · <a href="mailto:mkmiller@widener.edu">mkmiller@widener.edu</a></p></div>`}
+function go(id){cur=id;document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.t==id));const t=TABS.find(x=>x.id==id);id=='reg'?regime():id=='risk'?risk():id=='about'?about():pane(t)}
+$('#tabs').innerHTML=TABS.map(t=>`<button role="tab" data-t="${t.id}">${t.n}</button>`).join('');document.querySelectorAll('#tabs button').forEach(b=>b.onclick=()=>go(b.dataset.t));
+fetch('data/series.json').then(r=>r.json()).then(j=>{D=j.series;derive();$('#upd').textContent='refreshed '+new Date(j.updated).toLocaleString();go(location.hash.slice(1)&&TABS.some(t=>t.id==location.hash.slice(1))?location.hash.slice(1):'reg')}).catch(()=>{$('#main').innerHTML='<p class="err">Data file not found. Run the "refresh-data" workflow in the Actions tab, then reload.</p>';document.querySelector('[data-t=about]').onclick=about});
+</script></body></html>
